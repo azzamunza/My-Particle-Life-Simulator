@@ -1,1 +1,25 @@
-{\n  \"name\": \"my-particle-life-simulator\",\n  \"version\": \"1.0.0\",\n  \"description\": \"A particle life simulator using GPU\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"test\": \"echo 'Error: no test specified' && exit 1\"\n  },\n  \"repository\": {\n    \"type\": \"git\",\n    \"url\": \"https://github.com/azzamunza/My-Particle-Life-Simulator.git\"\n  },\n  \"author\": \"azzamunza\",\n  \"license\": \"MIT\"\n}
+{
+  "name": "my-particle-life-simulator",
+  "version": "1.0.0",
+  "description": "A particle life simulator using WebGPU",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/azzamunza/My-Particle-Life-Simulator.git"
+  },
+  "author": "azzamunza",
+  "license": "MIT",
+  "devDependencies": {
+    "@webgpu/types": "^0.1.54",
+    "typescript": "^5.4.5",
+    "vite": "^6.4.1"
+  },
+  "dependencies": {
+    "@tweakpane/core": "^2.0.5",
+    "tweakpane": "^3.1.10"
+  }
+}
