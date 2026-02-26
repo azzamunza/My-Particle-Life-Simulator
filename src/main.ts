@@ -193,8 +193,7 @@ async function main(): Promise<void> {
   const camera: Camera = { x: 0, y: 0, zoom: Math.min(canvas.width, canvas.height) / (opts.worldSize * 2) };
 
   function updateCamera(): void {
-    const aspect = canvas.width / canvas.height;
-    const data = new Float32Array([camera.x, camera.y, camera.zoom / aspect, 0]);
+    const data = new Float32Array([camera.x, camera.y, camera.zoom * 2 / canvas.height, 0]);
     device.queue.writeBuffer(cameraBuffer, 0, data);
   }
   updateCamera();
