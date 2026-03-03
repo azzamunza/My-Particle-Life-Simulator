@@ -109,6 +109,9 @@ interface Camera {
   zoom: number;
 }
 
+// Particle size in CSS pixels (radius). Clamped: 2 = full stop, 37.8 ≈ 1cm at 96 DPI
+let particleSizePx = 3.5;
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
@@ -194,7 +197,11 @@ async function main(): Promise<void> {
   const camera: Camera = { x: 0, y: 0, zoom: Math.min(canvas.width, canvas.height) / (opts.worldSize * 2) };
 
   function updateCamera(): void {
-    const data = new Float32Array([camera.x, camera.y, camera.zoom * 2 / canvas.height, 0]);
+    const dpr = window.devicePixelRatio || 1;
+    const physicalRadiusPx = particleSizePx * dpr;
+    // Convert physical pixel radius to clip-space: clipRadius = physicalPx * 2 / canvasHeight
+    const clipRadius = physicalRadiusPx * 2.0 / canvas.height;
+    const data = new Float32Array([camera.x, camera.y, camera.zoom * 2 / canvas.height, clipRadius]);
     device.queue.writeBuffer(cameraBuffer, 0, data);
   }
   updateCamera();
@@ -296,6 +303,14 @@ async function main(): Promise<void> {
 
   const camFolder = pane.addFolder({ title: "Camera" });
   camFolder.addBinding(camera, "zoom", { min: 1, max: 500, label: "Zoom" }).on("change", updateCamera);
+  camFolder.addBinding({ particleSizePx }, "particleSizePx", {
+    min: 2.0,
+    max: 37.8,
+    label: "Particle size (px)",
+  }).on("change", (ev) => {
+    particleSizePx = ev.value;
+    updateCamera();
+  });
 
   // -----------------------------------------------------------------------
   // Mouse interaction (pan)

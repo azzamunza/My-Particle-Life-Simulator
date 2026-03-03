@@ -3,9 +3,9 @@
 // Each instance corresponds to one particle (position, velocity, colour index).
 
 struct Camera {
-    pos   : vec2<f32>,
-    zoom  : f32,
-    _pad  : f32,
+    pos          : vec2<f32>,
+    zoom         : f32,
+    particleRadius : f32,   // radius in clip-space units (pixelRadius * 2 / canvasHeight)
 };
 
 struct VertexOut {
@@ -32,9 +32,6 @@ const QUAD = array<vec2<f32>, 6>(
     vec2<f32>(-1.0,  1.0),
 );
 
-// Particle radius in world units
-const RADIUS : f32 = 0.6;
-
 @vertex
 fn vs_main(
     @builtin(vertex_index)   vi : u32,
@@ -44,11 +41,11 @@ fn vs_main(
     let worldPos = particle.xy;
 
     let corner = QUAD[vi];
-    let offset = corner * RADIUS;
+    let offset = corner * camera.particleRadius;  // radius in clip-space units
 
     // World → clip space
     let viewPos = (worldPos - camera.pos) * camera.zoom;
-    let clipPos = viewPos + offset * camera.zoom;
+    let clipPos = viewPos + offset;  // offset is already in clip-space
 
     var out : VertexOut;
     out.pos   = vec4<f32>(clipPos, 0.0, 1.0);
