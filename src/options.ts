@@ -1,10 +1,10 @@
 // Simulation parameters
 
 /** Total number of particles */
-export const PARTICLE_COUNT = 50000;
+export const PARTICLE_COUNT = 3000;
 
 /** Number of distinct particle colour types */
-export const COLOUR_COUNT = 200;
+export const COLOUR_COUNT = 9;
 
 /** Squared side length of interaction matrix (COLOUR_COUNT * COLOUR_COUNT) */
 export const MATRIX_SIZE = COLOUR_COUNT * COLOUR_COUNT;
