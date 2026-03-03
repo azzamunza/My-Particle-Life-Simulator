@@ -119,6 +119,7 @@ async function main(): Promise<void> {
   window.addEventListener("resize", () => {
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
+    updateCamera();
   });
 
   const { device, context, format } = await initWebGPU(canvas);

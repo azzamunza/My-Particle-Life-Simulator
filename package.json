@@ -14,12 +14,12 @@
   "author": "azzamunza",
   "license": "MIT",
   "devDependencies": {
+    "@tweakpane/core": "^2.0.5",
     "@webgpu/types": "^0.1.54",
     "typescript": "^5.4.5",
     "vite": "^6.4.1"
   },
   "dependencies": {
-    "@tweakpane/core": "^2.0.5",
-    "tweakpane": "^3.1.10"
+    "tweakpane": "^4.0.5"
   }
 }
