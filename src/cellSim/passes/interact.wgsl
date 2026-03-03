@@ -110,9 +110,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                         let dist = length(diff);
                         if dist < 3.0 {
                             // Absorb: convert nutrient to cytoplasm inside the cell
-                            let angle  = atan2(p.pos.y, p.pos.x);
+                            let inDir  = normalize(q.pos);
                             let innerR = CELL_RADIUS * 0.5;
-                            particles[uj].pos      = vec2<f32>(cos(angle) * innerR, sin(angle) * innerR);
+                            particles[uj].pos      = inDir * innerR;
                             particles[uj].vel      = vec2<f32>(0.0);
                             particles[uj].force    = vec2<f32>(0.0);
                             particles[uj].ptype    = PTYPE_CYTOPLASM;

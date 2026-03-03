@@ -131,7 +131,6 @@ export function initScene(): SceneData {
   // ============================================================
   // 3. DNA (2 strands × 20 rungs = 80 particles)
   // ============================================================
-  const dnaStart = pCount;
   const dnaSpacing = 36.0 / (DNA_RUNGS - 1); // from -18 to +18
 
   const strandAIndices: number[] = [];
@@ -151,7 +150,6 @@ export function initScene(): SceneData {
   for (let i = 0; i < DNA_RUNGS; i++) {
     addBond(strandAIndices[i], strandBIndices[i], 16, DNA_RUNG_K); // rest length = |(-8)-(8)|=16
   }
-  void dnaStart; // suppress unused-variable warning
 
   // ============================================================
   // 4. Ribosomes (5 clusters of 4 particles = 20 particles)
