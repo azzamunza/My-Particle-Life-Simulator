@@ -481,8 +481,9 @@ export async function startCellSim(
 
     const encoder = device.createCommandEncoder();
 
-    // 1. Clear forceAccumBuffer to zero
+    // 1. Clear forceAccumBuffer and xpbdDeltaBuffer to zero
     encoder.clearBuffer(forceAccumBuffer);
+    encoder.clearBuffer(xpbdDeltaBuffer);
 
     // 2. Brownian motion + wave forces
     {
