@@ -39,13 +39,13 @@ export interface SimOptions {
 /** Default simulation parameters */
 export const defaultOptions: SimOptions = {
   colours: COLOUR_COUNT,
-  r: 15,
+  r: 30,
   force: 1,
   friction: 0.04,
   beta: 0.3,
   delta: 0.02,
-  avoidance: 4,
-  worldSize: 6,
+  avoidance: 8,
+  worldSize: 120,
   border: true,
   vortex: false,
 };

@@ -76,7 +76,7 @@ export async function startCellSim(
     cytoplLife:  CYTOPLASM_LIFE,
     channelR:    CHANNEL_RADIUS,
     zoom:        Math.min(canvas.width, canvas.height) / (200 * 2),
-    particlePx:  4.0,
+    particlePx:  0.5,
   };
 
   // -----------------------------------------------------------------------
@@ -197,12 +197,15 @@ export async function startCellSim(
   }
   writeUniforms();
 
+  // Camera pan position
+  const camPos = { x: 0, y: 0 };
+
   function writeCamera(): void {
     const dpr   = window.devicePixelRatio || 1;
     const physR = params.particlePx * dpr;
     const clipR = physR * 2.0 / canvas.height;
     device.queue.writeBuffer(cameraBuffer, 0, new Float32Array([
-      0, 0,
+      camPos.x, camPos.y,
       params.zoom * 2 / canvas.height,
       clipR,
     ]));
@@ -408,8 +411,8 @@ export async function startCellSim(
   cellFolder.addBinding(params, "channelR",   { min: 5, max: 50,   label: "Channel Radius" });
 
   const camFolder = pane.addFolder({ title: "Camera" });
-  camFolder.addBinding(params, "zoom",       { min: 0.001, max: 0.05, label: "Zoom" }).on("change", writeCamera);
-  camFolder.addBinding(params, "particlePx", { min: 1.0,  max: 20.0, label: "Particle size (px)" }).on("change", writeCamera);
+  camFolder.addBinding(params, "zoom",       { min: 0.5, max: 20, label: "Zoom" }).on("change", writeCamera);
+  camFolder.addBinding(params, "particlePx", { min: 0.25,  max: 20.0, label: "Particle size (px)" }).on("change", writeCamera);
 
   const btnRandomise = pane.addButton({ title: "Randomise" });
   btnRandomise.on("click", () => {
@@ -419,6 +422,32 @@ export async function startCellSim(
     device.queue.writeBuffer(freeListBuffer, 0, s2.freeList);
     device.queue.writeBuffer(freeCtrlBuffer, 0, new Uint32Array([0, s2.freeCount]));
   });
+
+  // -----------------------------------------------------------------------
+  // Mouse interaction (pan + zoom)
+  // -----------------------------------------------------------------------
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+  const onMouseDown = (e: MouseEvent) => { dragging = true; lastX = e.clientX; lastY = e.clientY; };
+  const onMouseUp   = () => { dragging = false; };
+  const onMouseMove = (e: MouseEvent) => {
+    if (!dragging) return;
+    const scale = params.zoom * 2 / canvas.height;
+    camPos.x -= (e.clientX - lastX) / scale / (canvas.height / 2);
+    camPos.y -= (e.clientY - lastY) / scale / (canvas.height / 2);
+    lastX = e.clientX;
+    lastY = e.clientY;
+    writeCamera();
+  };
+  const onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    params.zoom *= e.deltaY < 0 ? 1.1 : 0.9;
+    writeCamera();
+  };
+  canvas.addEventListener("mousedown", onMouseDown);
+  canvas.addEventListener("mouseup",   onMouseUp);
+  canvas.addEventListener("mousemove", onMouseMove);
+  canvas.addEventListener("wheel",     onWheel, { passive: false });
 
   // -----------------------------------------------------------------------
   // Resize handler
@@ -557,6 +586,10 @@ export async function startCellSim(
   return () => {
     cancelAnimationFrame(rafId);
     window.removeEventListener("resize", onResize);
+    canvas.removeEventListener("mousedown", onMouseDown);
+    canvas.removeEventListener("mouseup",   onMouseUp);
+    canvas.removeEventListener("mousemove", onMouseMove);
+    canvas.removeEventListener("wheel",     onWheel);
     pane.dispose();
     particleBuffer.destroy();
     bondBuffer.destroy();

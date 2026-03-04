@@ -116,8 +116,8 @@ export async function startParticleLife(
   canvas: HTMLCanvasElement,
   uiContainer: HTMLElement
 ): Promise<() => void> {
-  // Particle size in CSS pixels (radius). Clamped: 2 = full stop, 37.8 ≈ 1cm at 96 DPI
-  let particleSizePx = 3.5;
+  // Particle size in CSS pixels (radius). Clamped: 0.25 = tiny dot, 37.8 ≈ 1cm at 96 DPI
+  let particleSizePx = 0.5;
 
   const { device, context, format } = await initWebGPU(canvas);
 
@@ -278,12 +278,12 @@ export async function startParticleLife(
   const pane = new Pane({ container: uiContainer });
   const simFolder = pane.addFolder({ title: "Simulation" });
 
-  simFolder.addBinding(opts, "r",         { min: 1,    max: 50,  label: "Radius" });
+  simFolder.addBinding(opts, "r",         { min: 1,    max: 200, label: "Radius" });
   simFolder.addBinding(opts, "force",     { min: 0,    max: 5,   label: "Force" });
   simFolder.addBinding(opts, "friction",  { min: 0,    max: 0.5, label: "Friction" });
   simFolder.addBinding(opts, "beta",      { min: 0.01, max: 0.9, label: "Beta" });
   simFolder.addBinding(opts, "delta",     { min: 0.001,max: 0.1, label: "Delta" });
-  simFolder.addBinding(opts, "avoidance", { min: 0,    max: 20,  label: "Avoidance" });
+  simFolder.addBinding(opts, "avoidance", { min: 0,    max: 80,  label: "Avoidance" });
   simFolder.addBinding(opts, "border",    { label: "Wrap border" });
   simFolder.addBinding(opts, "vortex",    { label: "Vortex" });
 
@@ -296,9 +296,9 @@ export async function startParticleLife(
   });
 
   const camFolder = pane.addFolder({ title: "Camera" });
-  camFolder.addBinding(camera, "zoom", { min: 1, max: 500, label: "Zoom" }).on("change", updateCamera);
+  camFolder.addBinding(camera, "zoom", { min: 1, max: 2000, label: "Zoom" }).on("change", updateCamera);
   camFolder.addBinding({ particleSizePx }, "particleSizePx", {
-    min: 2.0,
+    min: 0.25,
     max: 37.8,
     label: "Particle size (px)",
   }).on("change", (ev) => {

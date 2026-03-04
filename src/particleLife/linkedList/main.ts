@@ -52,14 +52,14 @@ export class LinkedListEngine {
   // Buffer creation
   // -------------------------------------------------------------------------
   private createAccelerationBuffers(): void {
-    // Grid dimensions: assume sim r=15, worldSize=6 for initial sizing.
-    // We over-allocate to accommodate any runtime parameter changes.
-    // grid cells = ceil(worldSize*2 / r) + 1 per axis; use worst case r=1
-    const maxDim = Math.ceil(6 * 2 * 2) + 2; // r=0.5 worst case → generous
-    const maxCells = maxDim * maxDim * 4; // extra headroom
+    // World half-size is now 120, diameter 240.
+    // Grid cell = interaction radius r (min realistic ~5 world units).
+    // Max grid dim = ceil(worldSize*2 / r_min) + 2 = ceil(240/5)+2 = 50
+    // Use generous over-allocation: 128×128 = 16384 cells
+    const maxCells = 128 * 128;
 
-    const headsBytes = maxCells * 4; // one i32 per cell
-    const linkedBytes = PARTICLE_COUNT * 4; // one i32 per particle
+    const headsBytes = maxCells * 4;
+    const linkedBytes = PARTICLE_COUNT * 4;
 
     this.headsBuffer = this.device.createBuffer({
       label: "heads",
