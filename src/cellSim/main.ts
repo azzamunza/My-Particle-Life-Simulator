@@ -76,7 +76,7 @@ export async function startCellSim(
     cytoplLife:  CYTOPLASM_LIFE,
     channelR:    CHANNEL_RADIUS,
     zoom:        Math.min(canvas.width, canvas.height) / (200 * 2),
-    particlePx:  0.5,
+    particlePx:  4.0,
   };
 
   // -----------------------------------------------------------------------
@@ -412,7 +412,7 @@ export async function startCellSim(
 
   const camFolder = pane.addFolder({ title: "Camera" });
   camFolder.addBinding(params, "zoom",       { min: 0.5, max: 20, label: "Zoom" }).on("change", writeCamera);
-  camFolder.addBinding(params, "particlePx", { min: 0.25,  max: 20.0, label: "Particle size (px)" }).on("change", writeCamera);
+  camFolder.addBinding(params, "particlePx", { min: 1.0,  max: 20.0, label: "Particle size (px)" }).on("change", writeCamera);
 
   const btnRandomise = pane.addButton({ title: "Randomise" });
   btnRandomise.on("click", () => {
