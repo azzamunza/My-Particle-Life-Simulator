@@ -94,7 +94,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     if p.ptype == PTYPE_CHANNEL {
         let cx = cellCoord(p.pos.x);
         let cy = cellCoord(p.pos.y);
-        let scanCells = i32(ceil(uniforms.channelR / GRID_CELL_SIZE)) + 1;
+        let scanCells = min(i32(ceil(uniforms.channelR / GRID_CELL_SIZE)) + 1, i32(GRID_DIM));
 
         for (var dy2: i32 = -scanCells; dy2 <= scanCells; dy2++) {
             for (var dx2: i32 = -scanCells; dx2 <= scanCells; dx2++) {
@@ -104,29 +104,28 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 var j = heads[gridCellIdx(nx, ny)];
                 while j >= 0 {
                     let uj = u32(j);
-                    if uj < uniforms.numParticles {
-                        let q  = particles[uj];
-                        if q.ptype >= PTYPE_NUTRIENT_1 && q.ptype <= PTYPE_NUTRIENT_7
-                           && (q.flags & 1u) != 0u {
-                            let diff = q.pos - p.pos;
-                            let dist = length(diff);
-                            if dist < 3.0 {
-                                // Absorb: convert nutrient to cytoplasm inside the cell
-                                let innerR = CELL_RADIUS * 0.5;
-                                let qLen   = length(q.pos);
-                                let inDir  = select(vec2<f32>(1.0, 0.0), q.pos / qLen, qLen > MIN_LENGTH); // fallback: place on +x axis when pos is at origin
-                                particles[uj].pos      = inDir * innerR;
-                                particles[uj].vel      = vec2<f32>(0.0);
-                                particles[uj].force    = vec2<f32>(0.0);
-                                particles[uj].ptype    = PTYPE_CYTOPLASM;
-                                particles[uj].age      = 0.0;
-                            } else if dist < uniforms.channelR {
-                                // Attract toward channel
-                                let attraction = (1.0 - dist / uniforms.channelR) * 0.3;
-                                let dir = -diff / max(dist, MIN_LENGTH);
-                                atomicAdd(&forceAccum[uj * 2u],      i32(dir.x * attraction * FORCE_FP_SCALE));
-                                atomicAdd(&forceAccum[uj * 2u + 1u], i32(dir.y * attraction * FORCE_FP_SCALE));
-                            }
+                    if uj >= uniforms.numParticles { break; }
+                    let q  = particles[uj];
+                    if q.ptype >= PTYPE_NUTRIENT_1 && q.ptype <= PTYPE_NUTRIENT_7
+                       && (q.flags & 1u) != 0u {
+                        let diff = q.pos - p.pos;
+                        let dist = length(diff);
+                        if dist < 3.0 {
+                            // Absorb: convert nutrient to cytoplasm inside the cell
+                            let innerR = CELL_RADIUS * 0.5;
+                            let qLen   = length(q.pos);
+                            let inDir  = select(vec2<f32>(1.0, 0.0), q.pos / qLen, qLen > MIN_LENGTH); // fallback: place on +x axis when pos is at origin
+                            particles[uj].pos      = inDir * innerR;
+                            particles[uj].vel      = vec2<f32>(0.0);
+                            particles[uj].force    = vec2<f32>(0.0);
+                            particles[uj].ptype    = PTYPE_CYTOPLASM;
+                            particles[uj].age      = 0.0;
+                        } else if dist < uniforms.channelR {
+                            // Attract toward channel
+                            let attraction = (1.0 - dist / uniforms.channelR) * 0.3;
+                            let dir = -diff / max(dist, MIN_LENGTH);
+                            atomicAdd(&forceAccum[uj * 2u],      i32(dir.x * attraction * FORCE_FP_SCALE));
+                            atomicAdd(&forceAccum[uj * 2u + 1u], i32(dir.y * attraction * FORCE_FP_SCALE));
                         }
                     }
                     j = linked[j];

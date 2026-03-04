@@ -120,7 +120,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     else if p.ptype == PTYPE_PSEUDOPOD && p.chainIdx == 7u {
         let searchRadius = 40.0;
         let gc = gridCell(p.pos);
-        let cells = i32(ceil(searchRadius / GRID_CELL_SIZE)) + 1;
+        let cells = min(i32(ceil(searchRadius / GRID_CELL_SIZE)) + 1, i32(GRID_DIM));
         var bestDist = searchRadius;
         var bestDir  = vec2<f32>(0.0);
         for (var dy2: i32 = -cells; dy2 <= cells; dy2++) {
@@ -130,7 +130,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 if nx < 0 || ny < 0 || nx >= i32(GRID_DIM) || ny >= i32(GRID_DIM) { continue; }
                 var j = heads[cellIndex(nx, ny)];
                 while j >= 0 {
-                    let q = particles[u32(j)];
+                    let uj = u32(j);
+                    if uj >= uniforms.numParticles { break; }
+                    let q = particles[uj];
                     if q.ptype >= PTYPE_NUTRIENT_1 && q.ptype <= PTYPE_NUTRIENT_7 {
                         let diff = q.pos - p.pos;
                         let dist = length(diff);
