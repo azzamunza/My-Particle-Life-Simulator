@@ -341,8 +341,6 @@ export async function startCellSim(
       { binding: 2, resource: { buffer: headsBuffer } },
       { binding: 3, resource: { buffer: linkedBuffer } },
       { binding: 4, resource: { buffer: forceAccumBuffer } },
-      { binding: 5, resource: { buffer: freeListBuffer } },
-      { binding: 6, resource: { buffer: freeCtrlBuffer } },
     ],
   });
 
