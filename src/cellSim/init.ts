@@ -88,8 +88,9 @@ export function initScene(): SceneData {
   // 1. Membrane ring (MEMBRANE_NODES = 60 particles)
   // ============================================================
   const membraneStart = pCount;
-  const memCircumference = 2 * Math.PI * CELL_RADIUS;
-  const memRestLen = memCircumference / MEMBRANE_NODES;
+  // Use chord length (actual distance between adjacent particles) so bonds start
+  // at their natural rest length and produce zero initial force.
+  const memRestLen = 2 * Math.sin(Math.PI / MEMBRANE_NODES) * CELL_RADIUS;
 
   for (let i = 0; i < MEMBRANE_NODES; i++) {
     const angle = (i / MEMBRANE_NODES) * 2 * Math.PI;
@@ -111,8 +112,9 @@ export function initScene(): SceneData {
   // 2. Nucleus ring (NUCLEUS_NODES = 24 particles)
   // ============================================================
   const nucleusStart = pCount;
-  const nucCircumference = 2 * Math.PI * NUCLEUS_RADIUS;
-  const nucRestLen = nucCircumference / NUCLEUS_NODES;
+  // Use chord length (actual distance between adjacent particles) so bonds start
+  // at their natural rest length and produce zero initial force.
+  const nucRestLen = 2 * Math.sin(Math.PI / NUCLEUS_NODES) * NUCLEUS_RADIUS;
 
   for (let i = 0; i < NUCLEUS_NODES; i++) {
     const angle = (i / NUCLEUS_NODES) * 2 * Math.PI;

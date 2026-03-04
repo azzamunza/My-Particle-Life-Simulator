@@ -151,17 +151,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             fy += bestDir.y * strength;
         }
     }
-    // ---- Brownian motion for free (non-structural) particles ----
+    // ---- Brownian motion for all remaining active particles ----
     else {
-        let isStructural = (p.ptype <= 6u); // membrane...ribosome are structural
-        if !isStructural {
-            let seed1 = idx * 2u + tick * 7919u;
-            let seed2 = idx * 2u + 1u + tick * 7919u;
-            let rx = pcgFloat(seed1) * 2.0 - 1.0;
-            let ry = pcgFloat(seed2) * 2.0 - 1.0;
-            fx += rx * uniforms.brownianStr;
-            fy += ry * uniforms.brownianStr;
-        }
+        let seed1 = idx * 2u + tick * 7919u;
+        let seed2 = idx * 2u + 1u + tick * 7919u;
+        let rx = pcgFloat(seed1) * 2.0 - 1.0;
+        let ry = pcgFloat(seed2) * 2.0 - 1.0;
+        fx += rx * uniforms.brownianStr;
+        fy += ry * uniforms.brownianStr;
     }
 
     addForce(idx, fx, fy);
