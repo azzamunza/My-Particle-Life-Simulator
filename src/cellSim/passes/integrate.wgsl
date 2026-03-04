@@ -40,6 +40,7 @@ struct Particle {
 const FORCE_FP_SCALE  : f32 = 1024.0;
 const WORLD_SIZE      : f32 = 200.0;
 const PTYPE_INACTIVE  : u32 = 255u;
+const MAX_SPEED       : f32 = 500.0;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -59,6 +60,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let damp   = uniforms.damping;
 
     var vel = (p.vel + force * dt) * damp;
+
+    // Clamp velocity to prevent runaway Inf/NaN on D3D12
+    let speed = length(vel);
+    if speed > MAX_SPEED {
+        vel = vel * (MAX_SPEED / speed);
+    }
+
     var pos = p.pos + vel * dt;
 
     // World boundary wrap
