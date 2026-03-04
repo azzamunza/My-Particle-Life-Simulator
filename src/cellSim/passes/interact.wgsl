@@ -44,6 +44,7 @@ const GRID_CELL_SIZE : f32 = 22.0;
 const GRID_DIM       : u32 = 20u;
 const CELL_RADIUS    : f32 = 60.0;
 const FORCE_FP_SCALE : f32 = 1024.0;
+const MIN_LENGTH     : f32 = 0.001;
 
 const PTYPE_CHANNEL   : u32 = 1u;
 const PTYPE_PUMP      : u32 = 2u;
@@ -110,8 +111,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                         let dist = length(diff);
                         if dist < 3.0 {
                             // Absorb: convert nutrient to cytoplasm inside the cell
-                            let inDir  = normalize(q.pos);
                             let innerR = CELL_RADIUS * 0.5;
+                            let qLen   = length(q.pos);
+                            let inDir  = select(vec2<f32>(1.0, 0.0), q.pos / qLen, qLen > MIN_LENGTH); // fallback: place on +x axis when pos is at origin
                             particles[uj].pos      = inDir * innerR;
                             particles[uj].vel      = vec2<f32>(0.0);
                             particles[uj].force    = vec2<f32>(0.0);
@@ -120,7 +122,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                         } else if dist < uniforms.channelR {
                             // Attract toward channel
                             let attraction = (1.0 - dist / uniforms.channelR) * 0.3;
-                            let dir = -diff / max(dist, 0.001);
+                            let dir = -diff / max(dist, MIN_LENGTH);
                             atomicAdd(&forceAccum[uj * 2u],     i32(dir.x * attraction * FORCE_FP_SCALE));
                             atomicAdd(&forceAccum[uj * 2u + 1u], i32(dir.y * attraction * FORCE_FP_SCALE));
                         }
