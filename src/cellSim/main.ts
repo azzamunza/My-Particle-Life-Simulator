@@ -132,6 +132,17 @@ export async function startCellSim(
   new Int32Array(headsInitBuffer.getMappedRange()).set(headsInitData);
   headsInitBuffer.unmap();
 
+  // linked list init buffer: all -1
+  const linkedInitData = new Int32Array(MAX_PARTICLES).fill(-1);
+  const linkedInitBuffer = device.createBuffer({
+    label: "grid linkedInit",
+    size:  MAX_PARTICLES * 4,
+    usage: GPUBufferUsage.COPY_SRC,
+    mappedAtCreation: true,
+  });
+  new Int32Array(linkedInitBuffer.getMappedRange()).set(linkedInitData);
+  linkedInitBuffer.unmap();
+
   // Spatial grid: linked list (i32 per particle)
   const linkedBuffer = device.createBuffer({
     label: "grid linked",
@@ -528,8 +539,9 @@ export async function startCellSim(
       pass.end();
     }
 
-    // 7. Spatial grid rebuild (reset heads first)
-    encoder.copyBufferToBuffer(headsInitBuffer, 0, headsBuffer, 0, GRID_CELLS * 4);
+    // 7. Spatial grid rebuild (reset heads + linked first)
+    encoder.copyBufferToBuffer(headsInitBuffer,  0, headsBuffer,  0, GRID_CELLS * 4);
+    encoder.copyBufferToBuffer(linkedInitBuffer, 0, linkedBuffer, 0, MAX_PARTICLES * 4);
     {
       const pass = encoder.beginComputePass({ label: "grid" });
       pass.setPipeline(gridPipeline);
@@ -595,6 +607,7 @@ export async function startCellSim(
     xpbdDeltaBuffer.destroy();
     headsBuffer.destroy();
     headsInitBuffer.destroy();
+    linkedInitBuffer.destroy();
     linkedBuffer.destroy();
     freeListBuffer.destroy();
     freeCtrlBuffer.destroy();
