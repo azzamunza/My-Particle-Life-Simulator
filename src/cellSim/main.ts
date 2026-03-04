@@ -131,6 +131,10 @@ export async function startCellSim(
   });
   new Int32Array(headsInitBuffer.getMappedRange()).set(headsInitData);
   headsInitBuffer.unmap();
+  // Pre-fill headsBuffer with -1 so the first brownian pass (which runs before
+  // the grid rebuild) sees an empty grid instead of the zero-initialised buffer,
+  // which would cause the pseudopod-tip while-loop to spin forever (GPU hang).
+  device.queue.writeBuffer(headsBuffer, 0, headsInitData);
 
   // linked list init buffer: all -1
   const linkedInitData = new Int32Array(MAX_PARTICLES).fill(-1);
@@ -149,6 +153,8 @@ export async function startCellSim(
     size:  MAX_PARTICLES * 4,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
+  // Pre-fill linkedBuffer with -1 for the same reason as headsBuffer above.
+  device.queue.writeBuffer(linkedBuffer, 0, linkedInitData);
 
   // Free list ring buffer
   const freeListBuffer = device.createBuffer({
