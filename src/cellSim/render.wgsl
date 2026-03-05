@@ -37,7 +37,7 @@ const QUAD = array<vec2<f32>, 6>(
     vec2<f32>(-1.0,  1.0),
 );
 
-const WORLD_SIZE : f32 = 200.0;
+const WORLD_SIZE : f32 = 800.0;
 
 // HSL → RGB (h in [0,1])
 fn hsl2rgb(h: f32, s: f32, l: f32) -> vec3<f32> {
@@ -70,6 +70,7 @@ fn typeColor(ptype: u32) -> vec3<f32> {
         case 8u:  { return vec3<f32>(0.6, 1.0, 0.6); }  // CILIA:     pale green
         case 9u:  { return vec3<f32>(0.9, 0.9, 0.3); }  // FLAGELLUM: yellow
         case 10u: { return vec3<f32>(0.8, 0.5, 0.9); }  // PSEUDOPOD: purple
+        case 19u: { return vec3<f32>(0.15, 0.35, 0.6); } // SOLUTION:  dark blue (fluid)
         default: {
             if ptype >= 11u && ptype <= 17u {
                 // NUTRIENT 1-7: rainbow

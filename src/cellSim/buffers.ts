@@ -3,13 +3,13 @@
 // ============================================================
 
 // ---- Capacity limits ----
-export const MAX_PARTICLES  = 2048;
-export const MAX_BONDS      = 4096;
+export const MAX_PARTICLES  = 4096;
+export const MAX_BONDS      = 6144;
 export const MAX_CHAIN_LEN  = 16;    // max nodes per cilia/flagellum chain
 
-// ---- Cell geometry (world units, world is ~200×200) ----
-export const CELL_RADIUS    = 60.0;
-export const NUCLEUS_RADIUS = 22.0;  // 38% of cell radius
+// ---- Cell geometry (world units, world is ~800×800) ----
+export const CELL_RADIUS    = 80.0;
+export const NUCLEUS_RADIUS = 28.0;  // 35% of cell radius
 export const MEMBRANE_NODES = 60;
 export const NUCLEUS_NODES  = 24;
 
@@ -20,22 +20,26 @@ export const RIBOSOME_COUNT = 5;     // 5 × 4 particles = 20
 export const CILIA_COUNT    = 8;     // 8 chains × 6 nodes = 48
 export const FLAGELLUM_LEN  = 12;    // 12 nodes
 export const PSEUDOPOD_COUNT= 3;     // 3 × 8 nodes = 24
-export const CYTOPLASM_MAX  = 200;
-export const NUTRIENT_COUNT = 150;
+export const CYTOPLASM_MAX  = 400;
+export const NUTRIENT_COUNT = 500;
 export const WASTE_MAX      = 80;
+export const SOLUTION_COUNT = 1200;  // liquid solution particles that fill empty space
+
+// ---- Cell division ----
+export const DIVISION_THRESHOLD = 200; // cytoplasm count that triggers cell division
 
 // ---- Physics ----
 export const DT             = 0.016; // time step (~60fps)
-export const XPBD_ITERS     = 3;     // constraint solver iterations
-export const BROWNIAN_STR   = 20.0;  // Brownian motion strength
-export const DAMPING        = 0.98;  // velocity damping per tick
-export const MEMBRANE_K     = 800.0; // membrane spring stiffness
-export const NUCLEUS_K      = 600.0;
+export const XPBD_ITERS     = 4;     // constraint solver iterations
+export const BROWNIAN_STR   = 1.5;   // Brownian motion strength (only for cytoplasm/nutrients/solution)
+export const DAMPING        = 0.96;  // velocity damping per tick
+export const MEMBRANE_K     = 1200.0;// membrane spring stiffness
+export const NUCLEUS_K      = 900.0;
 export const DNA_BACKBONE_K = 500.0;
 export const DNA_RUNG_K     = 300.0;
 export const RIBOSOME_K     = 900.0; // stiff
 export const CILIA_K        = 200.0;
-export const PRESSURE_K     = 50.0;  // radial pressure strength
+export const PRESSURE_K     = 80.0;  // radial pressure strength
 export const CHANNEL_RADIUS = 22.0;  // nutrient scan radius (world units)
 export const CYTOPLASM_LIFE = 600;   // ticks before cytoplasm becomes waste
 export const CILIA_WAVE_STRENGTH    = 0.8;
@@ -55,6 +59,7 @@ export const PTYPE_FLAGELLUM  = 9;
 export const PTYPE_PSEUDOPOD  = 10;
 export const PTYPE_NUTRIENT_1 = 11;
 export const PTYPE_WASTE      = 18;
+export const PTYPE_SOLUTION   = 19;  // liquid solution / extracellular fluid
 export const PTYPE_INACTIVE   = 255; // slot is in the free list
 
 // ---- Particle struct (12 × f32/u32 = 48 bytes) ----
@@ -80,10 +85,10 @@ export const BOND_STRIDE  = 16; // bytes
 export const BOND_UINTS   = 4;  // values
 
 // ---- Spatial grid ----
-export const WORLD_SIZE     = 200.0; // world spans -200 … +200 on both axes
+export const WORLD_SIZE     = 800.0; // world spans -800 … +800 on both axes
 export const GRID_CELL_SIZE = CHANNEL_RADIUS; // 22.0
-export const GRID_DIM       = Math.ceil((WORLD_SIZE * 2) / GRID_CELL_SIZE) + 1; // 20
-export const GRID_CELLS     = GRID_DIM * GRID_DIM; // 400
+export const GRID_DIM       = Math.ceil((WORLD_SIZE * 2) / GRID_CELL_SIZE) + 1; // 74
+export const GRID_CELLS     = GRID_DIM * GRID_DIM; // 5476
 
 // ---- Fixed-point scale for atomic force / XPBD accumulation ----
 export const FORCE_FP_SCALE = 1024.0;

@@ -37,9 +37,9 @@ struct Particle {
 @group(0) @binding(2) var<storage, read_write> heads    : array<atomic<i32>>;
 @group(0) @binding(3) var<storage, read_write> linked   : array<i32>;
 
-const WORLD_SIZE     : f32 = 200.0;
+const WORLD_SIZE     : f32 = 800.0;
 const GRID_CELL_SIZE : f32 = 22.0;
-const GRID_DIM       : u32 = 20u;
+const GRID_DIM       : u32 = 74u;
 const PTYPE_INACTIVE : u32 = 255u;
 
 fn cellCoord(v: f32) -> u32 {

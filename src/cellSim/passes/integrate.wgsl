@@ -38,7 +38,7 @@ struct Particle {
 @group(0) @binding(2) var<storage, read_write>  forceAccum: array<atomic<i32>>;
 
 const FORCE_FP_SCALE  : f32 = 1024.0;
-const WORLD_SIZE      : f32 = 200.0;
+const WORLD_SIZE      : f32 = 800.0;
 const PTYPE_INACTIVE  : u32 = 255u;
 const MAX_SPEED       : f32 = 500.0;
 

@@ -38,17 +38,30 @@ struct Particle {
 @group(0) @binding(4) var<storage, read>       linked    : array<i32>;
 
 const FORCE_FP_SCALE  : f32 = 1024.0;
-const WORLD_SIZE      : f32 = 200.0;
+const WORLD_SIZE      : f32 = 800.0;
 const GRID_CELL_SIZE  : f32 = 22.0;
-const GRID_DIM        : u32 = 20u;
+const GRID_DIM        : u32 = 74u;
 
+// Structural particles that must NOT receive Brownian motion (they are spring-bonded
+// and any random kick would cause the membrane/nucleus to explode apart).
 const PTYPE_MEMBRANE  : u32 = 0u;
+const PTYPE_CHANNEL   : u32 = 1u;
+const PTYPE_PUMP      : u32 = 2u;
+const PTYPE_NUCLEUS   : u32 = 3u;
+const PTYPE_DNA_A     : u32 = 4u;
+const PTYPE_DNA_B     : u32 = 5u;
+const PTYPE_RIBOSOME  : u32 = 6u;
+// Appendages that have their own wave forcing
 const PTYPE_CILIA     : u32 = 8u;
 const PTYPE_FLAGELLUM : u32 = 9u;
 const PTYPE_PSEUDOPOD : u32 = 10u;
-const PTYPE_INACTIVE  : u32 = 255u;
+// Free-floating particles that use Brownian motion
+const PTYPE_CYTOPLASM : u32 = 7u;
 const PTYPE_NUTRIENT_1: u32 = 11u;
 const PTYPE_NUTRIENT_7: u32 = 17u;
+const PTYPE_WASTE     : u32 = 18u;
+const PTYPE_SOLUTION  : u32 = 19u;
+const PTYPE_INACTIVE  : u32 = 255u;
 
 // PCG pseudo-random hash
 fn pcg(v: u32) -> u32 {
@@ -116,9 +129,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             fy += perp.y * wave * uniforms.flagWave;
         }
     }
-    // ---- Pseudopod tip: attract to nearest nutrient within 40 units ----
+    // ---- Pseudopod tip: attract to nearest nutrient within 60 units ----
     else if p.ptype == PTYPE_PSEUDOPOD && p.chainIdx == 7u {
-        let searchRadius = 40.0;
+        let searchRadius = 60.0;
         let gc = gridCell(p.pos);
         let cells = min(i32(ceil(searchRadius / GRID_CELL_SIZE)) + 1, i32(GRID_DIM));
         var bestDist = searchRadius;
@@ -151,15 +164,26 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             fy += bestDir.y * strength;
         }
     }
-    // ---- Brownian motion for all remaining active particles ----
-    else {
+    // ---- Brownian motion for free-floating particles only ----
+    // Structural particles (membrane, nucleus, DNA, ribosome) MUST NOT receive
+    // Brownian motion — they are spring-bonded and random kicks would cause them
+    // to explode out of their rest configurations.
+    else if p.ptype == PTYPE_CYTOPLASM
+         || (p.ptype >= PTYPE_NUTRIENT_1 && p.ptype <= PTYPE_NUTRIENT_7)
+         || p.ptype == PTYPE_WASTE
+         || p.ptype == PTYPE_SOLUTION {
         let seed1 = idx * 2u + tick * 7919u;
         let seed2 = idx * 2u + 1u + tick * 7919u;
         let rx = pcgFloat(seed1) * 2.0 - 1.0;
         let ry = pcgFloat(seed2) * 2.0 - 1.0;
-        fx += rx * uniforms.brownianStr;
-        fy += ry * uniforms.brownianStr;
+        // Solution particles use a gentler Brownian to avoid overpressure
+        let strength = select(uniforms.brownianStr, uniforms.brownianStr * 0.4, p.ptype == PTYPE_SOLUTION);
+        fx += rx * strength;
+        fy += ry * strength;
     }
+    // All other types (membrane ring nodes, nucleus, DNA strands, ribosomes)
+    // receive zero random forcing — they are purely governed by spring bonds
+    // and radial pressure constraints.
 
     addForce(idx, fx, fy);
 }

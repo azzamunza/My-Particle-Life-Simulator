@@ -36,8 +36,8 @@ struct Particle {
 @group(0) @binding(2) var<storage, read_write>   forceAccum: array<atomic<i32>>;
 
 const FORCE_FP_SCALE  : f32 = 1024.0;
-const CELL_RADIUS     : f32 = 60.0;
-const NUCLEUS_RADIUS  : f32 = 22.0;
+const CELL_RADIUS     : f32 = 80.0;
+const NUCLEUS_RADIUS  : f32 = 28.0;
 const PTYPE_MEMBRANE  : u32 = 0u;
 const PTYPE_CHANNEL   : u32 = 1u;
 const PTYPE_PUMP      : u32 = 2u;

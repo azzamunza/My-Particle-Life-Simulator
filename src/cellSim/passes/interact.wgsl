@@ -1,4 +1,5 @@
 // Pass 7: Nutrient absorption via channel proteins + cytoplasm aging + pump ejection
+//         + solution particle fluid avoidance behaviour
 
 struct Uniforms {
     tick         : u32,
@@ -39,22 +40,27 @@ struct Particle {
 @group(0) @binding(5) var<storage, read_write>  freeList   : array<u32>;
 @group(0) @binding(6) var<storage, read_write>  freeCtrl   : array<atomic<u32>>;
 
-const WORLD_SIZE     : f32 = 200.0;
+const WORLD_SIZE     : f32 = 800.0;
 const GRID_CELL_SIZE : f32 = 22.0;
-const GRID_DIM       : u32 = 20u;
-const CELL_RADIUS    : f32 = 60.0;
+const GRID_DIM       : u32 = 74u;
+const CELL_RADIUS    : f32 = 80.0;
 const FORCE_FP_SCALE : f32 = 1024.0;
 const MIN_LENGTH     : f32 = 0.001;
+
+// Solution particle avoidance distances
+const SOLUTION_AVOID_R  : f32 = 14.0;  // radius at which solution avoids non-solution
+const SOLUTION_REPEL_R  : f32 = 10.0;  // radius at which solution particles repel each other
 
 const PTYPE_CHANNEL   : u32 = 1u;
 const PTYPE_PUMP      : u32 = 2u;
 const PTYPE_CYTOPLASM : u32 = 7u;
 const PTYPE_WASTE     : u32 = 18u;
+const PTYPE_SOLUTION  : u32 = 19u;
 const PTYPE_INACTIVE  : u32 = 255u;
 const PTYPE_NUTRIENT_1: u32 = 11u;
 const PTYPE_NUTRIENT_7: u32 = 17u;
 
-const MAX_PARTICLES_U : u32 = 2048u;
+const MAX_PARTICLES_U : u32 = 4096u;
 
 fn cellCoord(v: f32) -> i32 {
     let shifted = v + WORLD_SIZE;
@@ -76,6 +82,11 @@ fn popFreeSlot() -> u32 {
     return freeList[head % MAX_PARTICLES_U];
 }
 
+fn addForceA(idx: u32, fx: f32, fy: f32) {
+    atomicAdd(&forceAccum[idx * 2u],      i32(fx * FORCE_FP_SCALE));
+    atomicAdd(&forceAccum[idx * 2u + 1u], i32(fy * FORCE_FP_SCALE));
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let idx = gid.x;
@@ -83,6 +94,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     var p = particles[idx];
     if (p.flags & 1u) == 0u || p.ptype == PTYPE_INACTIVE { return; }
+
+    let cx = cellCoord(p.pos.x);
+    let cy = cellCoord(p.pos.y);
 
     // ---- Increment age for cytoplasm particles ----
     if p.ptype == PTYPE_CYTOPLASM {
@@ -92,8 +106,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // ---- Channel protein: scan for nearby nutrients ----
     if p.ptype == PTYPE_CHANNEL {
-        let cx = cellCoord(p.pos.x);
-        let cy = cellCoord(p.pos.y);
         let scanCells = min(i32(ceil(uniforms.channelR / GRID_CELL_SIZE)) + 1, i32(GRID_DIM));
 
         for (var dy2: i32 = -scanCells; dy2 <= scanCells; dy2++) {
@@ -114,7 +126,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                             // Absorb: convert nutrient to cytoplasm inside the cell
                             let innerR = CELL_RADIUS * 0.5;
                             let qLen   = length(q.pos);
-                            let inDir  = select(vec2<f32>(1.0, 0.0), q.pos / qLen, qLen > MIN_LENGTH); // fallback: place on +x axis when pos is at origin
+                            let inDir  = select(vec2<f32>(1.0, 0.0), q.pos / qLen, qLen > MIN_LENGTH);
                             particles[uj].pos      = inDir * innerR;
                             particles[uj].vel      = vec2<f32>(0.0);
                             particles[uj].force    = vec2<f32>(0.0);
@@ -124,14 +136,58 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                             // Attract toward channel
                             let attraction = (1.0 - dist / uniforms.channelR) * 0.3;
                             let dir = -diff / max(dist, MIN_LENGTH);
-                            atomicAdd(&forceAccum[uj * 2u],      i32(dir.x * attraction * FORCE_FP_SCALE));
-                            atomicAdd(&forceAccum[uj * 2u + 1u], i32(dir.y * attraction * FORCE_FP_SCALE));
+                            addForceA(uj, dir.x * attraction, dir.y * attraction);
                         }
                     }
                     j = linked[j];
                 }
             }
         }
+    }
+
+    // ---- Solution particle: fluid avoidance behaviour ----
+    // Solution particles are pushed aside by non-solution particles,
+    // filling the empty extracellular space like a liquid medium.
+    if p.ptype == PTYPE_SOLUTION {
+        let scanCells = min(i32(ceil(SOLUTION_AVOID_R / GRID_CELL_SIZE)) + 1, i32(GRID_DIM));
+        var fx: f32 = 0.0;
+        var fy: f32 = 0.0;
+
+        for (var dy2: i32 = -scanCells; dy2 <= scanCells; dy2++) {
+            for (var dx2: i32 = -scanCells; dx2 <= scanCells; dx2++) {
+                let nx = cx + dx2;
+                let ny = cy + dy2;
+                if nx < 0 || ny < 0 || nx >= i32(GRID_DIM) || ny >= i32(GRID_DIM) { continue; }
+                var j = heads[gridCellIdx(nx, ny)];
+                while j >= 0 {
+                    let uj = u32(j);
+                    if uj >= uniforms.numParticles { break; }
+                    if uj != idx {
+                        let q = particles[uj];
+                        if (q.flags & 1u) != 0u && q.ptype != PTYPE_INACTIVE {
+                            let diff = p.pos - q.pos;
+                            let dist = length(diff);
+                            if dist > MIN_LENGTH {
+                                let dir = diff / dist;
+                                if q.ptype != PTYPE_SOLUTION && dist < SOLUTION_AVOID_R {
+                                    // Strong repulsion away from non-solution particles
+                                    let strength = (1.0 - dist / SOLUTION_AVOID_R) * 1.8;
+                                    fx += dir.x * strength;
+                                    fy += dir.y * strength;
+                                } else if q.ptype == PTYPE_SOLUTION && dist < SOLUTION_REPEL_R {
+                                    // Gentle mutual repulsion for uniform space filling
+                                    let strength = (1.0 - dist / SOLUTION_REPEL_R) * 0.3;
+                                    fx += dir.x * strength;
+                                    fy += dir.y * strength;
+                                }
+                            }
+                        }
+                    }
+                    j = linked[j];
+                }
+            }
+        }
+        addForceA(idx, fx, fy);
     }
 
     // ---- Respawn nutrients that leave world bounds ----
@@ -141,8 +197,25 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         if abs(p.pos.x) > halfW || abs(p.pos.y) > halfW {
             // Respawn on a random world-boundary edge
             let tick = uniforms.tick;
-            // Simple deterministic respawn using tick+idx as seed
             let seed = idx * 1664525u + tick * 1013904223u;
+            let edge = seed % 4u;
+            var nx2: f32; var ny2: f32;
+            let t = f32((seed >> 8u) % 10000u) / 10000.0 * 2.0 - 1.0;
+            if edge == 0u       { nx2 = -halfW; ny2 = t * halfW; }
+            else if edge == 1u  { nx2 =  halfW; ny2 = t * halfW; }
+            else if edge == 2u  { nx2 = t * halfW; ny2 = -halfW; }
+            else                { nx2 = t * halfW; ny2 =  halfW; }
+            particles[idx].pos = vec2<f32>(nx2, ny2);
+            particles[idx].vel = vec2<f32>(0.0);
+        }
+    }
+
+    // ---- Respawn solution particles that leave world bounds ----
+    if p.ptype == PTYPE_SOLUTION {
+        let halfW = WORLD_SIZE;
+        if abs(p.pos.x) > halfW || abs(p.pos.y) > halfW {
+            let tick = uniforms.tick;
+            let seed = idx * 1664525u + tick * 1013904223u + 99999u;
             let edge = seed % 4u;
             var nx2: f32; var ny2: f32;
             let t = f32((seed >> 8u) % 10000u) / 10000.0 * 2.0 - 1.0;
