@@ -27,7 +27,7 @@ export const WASTE_MAX      = 80;
 // ---- Physics ----
 export const DT             = 0.016; // time step (~60fps)
 export const XPBD_ITERS     = 3;     // constraint solver iterations
-export const BROWNIAN_STR   = 0.4;   // Brownian motion strength
+export const BROWNIAN_STR   = 20.0;  // Brownian motion strength
 export const DAMPING        = 0.98;  // velocity damping per tick
 export const MEMBRANE_K     = 800.0; // membrane spring stiffness
 export const NUCLEUS_K      = 600.0;

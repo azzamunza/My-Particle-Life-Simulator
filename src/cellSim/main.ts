@@ -537,16 +537,7 @@ export async function startCellSim(
       }
     }
 
-    // 6. Velocity + position integration (reads forceAccum, clears it)
-    {
-      const pass = encoder.beginComputePass({ label: "integrate" });
-      pass.setPipeline(integratePipeline);
-      pass.setBindGroup(0, integrateBG);
-      pass.dispatchWorkgroups(particleWG);
-      pass.end();
-    }
-
-    // 7. Spatial grid rebuild (reset heads + linked first)
+    // 6. Spatial grid rebuild (reset heads + linked first, use XPBD-corrected positions)
     encoder.copyBufferToBuffer(headsInitBuffer,  0, headsBuffer,  0, GRID_CELLS * 4);
     encoder.copyBufferToBuffer(linkedInitBuffer, 0, linkedBuffer, 0, MAX_PARTICLES * 4);
     {
@@ -557,11 +548,20 @@ export async function startCellSim(
       pass.end();
     }
 
-    // 8. Nutrient absorption + proximity forces
+    // 7. Nutrient absorption + proximity forces (forces now included in this frame's integrate)
     {
       const pass = encoder.beginComputePass({ label: "interact" });
       pass.setPipeline(interactPipeline);
       pass.setBindGroup(0, interactBG);
+      pass.dispatchWorkgroups(particleWG);
+      pass.end();
+    }
+
+    // 8. Velocity + position integration (reads forceAccum, clears it)
+    {
+      const pass = encoder.beginComputePass({ label: "integrate" });
+      pass.setPipeline(integratePipeline);
+      pass.setBindGroup(0, integrateBG);
       pass.dispatchWorkgroups(particleWG);
       pass.end();
     }
