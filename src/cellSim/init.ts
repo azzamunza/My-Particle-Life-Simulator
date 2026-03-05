@@ -5,7 +5,7 @@ import {
   DNA_RUNGS,
   RIBOSOME_COUNT,
   CILIA_COUNT, FLAGELLUM_LEN, PSEUDOPOD_COUNT,
-  NUTRIENT_COUNT,
+  NUTRIENT_COUNT, SOLUTION_COUNT,
   MEMBRANE_K, NUCLEUS_K,
   DNA_BACKBONE_K, DNA_RUNG_K,
   RIBOSOME_K, CILIA_K,
@@ -14,7 +14,7 @@ import {
   PTYPE_NUCLEUS, PTYPE_DNA_A, PTYPE_DNA_B,
   PTYPE_RIBOSOME, PTYPE_CYTOPLASM,
   PTYPE_CILIA, PTYPE_FLAGELLUM, PTYPE_PSEUDOPOD,
-  PTYPE_NUTRIENT_1, PTYPE_INACTIVE,
+  PTYPE_NUTRIENT_1, PTYPE_SOLUTION, PTYPE_INACTIVE,
   WORLD_SIZE,
 } from "./buffers";
 
@@ -30,7 +30,7 @@ export interface SceneData {
   freeCount:    number;
 }
 
-export function initScene(): SceneData {
+export function initScene(offsetX = 0, offsetY = 0): SceneData {
   const particleData = new ArrayBuffer(MAX_PARTICLES * 12 * 4); // 12 × f32/u32
   const pf32 = new Float32Array(particleData);
   const pu32 = new Uint32Array(particleData);
@@ -47,7 +47,7 @@ export function initScene(): SceneData {
   let pCount = 0;
   let bCount = 0;
 
-  // ------ Helper: add one particle ------
+  // ------ Helper: add one particle (coordinates are offset by the cell origin) ------
   function addParticle(
     px: number, py: number,
     vx: number, vy: number,
@@ -59,8 +59,8 @@ export function initScene(): SceneData {
   ): number {
     const i = pCount++;
     const b = i * PARTICLE_FLOATS;
-    pf32[b + 0] = px;
-    pf32[b + 1] = py;
+    pf32[b + 0] = px + offsetX;
+    pf32[b + 1] = py + offsetY;
     pf32[b + 2] = vx;
     pf32[b + 3] = vy;
     pf32[b + 4] = 0; // force.x (cleared)
@@ -133,15 +133,19 @@ export function initScene(): SceneData {
   // ============================================================
   // 3. DNA (2 strands × 20 rungs = 80 particles)
   // ============================================================
-  const dnaSpacing = 36.0 / (DNA_RUNGS - 1); // from -18 to +18
+  // Scale DNA to fit proportionally inside the nucleus
+  const dnaHalfSpan = NUCLEUS_RADIUS * 0.75; // X half-span
+  const dnaYOffset  = NUCLEUS_RADIUS * 0.36; // Y offset between strands
+  const dnaSpacing  = (dnaHalfSpan * 2) / (DNA_RUNGS - 1);
+  const dnaRungLen  = dnaYOffset * 2;        // rest length of rung bonds
 
   const strandAIndices: number[] = [];
   const strandBIndices: number[] = [];
 
   for (let i = 0; i < DNA_RUNGS; i++) {
-    const x = -18 + i * dnaSpacing;
-    strandAIndices.push(addParticle(x, -8, 0, 0, PTYPE_DNA_A));
-    strandBIndices.push(addParticle(x,  8, 0, 0, PTYPE_DNA_B));
+    const x = -dnaHalfSpan + i * dnaSpacing;
+    strandAIndices.push(addParticle(x, -dnaYOffset, 0, 0, PTYPE_DNA_A));
+    strandBIndices.push(addParticle(x,  dnaYOffset, 0, 0, PTYPE_DNA_B));
   }
   // Backbone bonds (strand A and strand B)
   for (let i = 0; i < DNA_RUNGS - 1; i++) {
@@ -150,7 +154,7 @@ export function initScene(): SceneData {
   }
   // Rung bonds
   for (let i = 0; i < DNA_RUNGS; i++) {
-    addBond(strandAIndices[i], strandBIndices[i], 16, DNA_RUNG_K); // rest length = |(-8)-(8)|=16
+    addBond(strandAIndices[i], strandBIndices[i], dnaRungLen, DNA_RUNG_K);
   }
 
   // ============================================================
@@ -269,7 +273,7 @@ export function initScene(): SceneData {
   }
 
   // ============================================================
-  // 9. Nutrients (150 particles, PTYPE_NUTRIENT_1 … +6)
+  // 9. Nutrients (500 particles, PTYPE_NUTRIENT_1 … +6)
   // ============================================================
   const NUTRIENT_TYPES = 7;
   for (let n = 0; n < NUTRIENT_COUNT && pCount < MAX_PARTICLES; n++) {
@@ -287,7 +291,24 @@ export function initScene(): SceneData {
   }
 
   // ============================================================
-  // 10. Free list: remaining inactive slots
+  // 10. Solution / extracellular fluid particles
+  //     Fill the world outside (and loosely around) the cell.
+  //     These act as a liquid medium that other particles push through.
+  // ============================================================
+  let solCount = 0;
+  while (solCount < SOLUTION_COUNT && pCount < MAX_PARTICLES) {
+    const px = (Math.random() * 2 - 1) * WORLD_SIZE;
+    const py = (Math.random() * 2 - 1) * WORLD_SIZE;
+    // Keep solution particles outside the cell membrane (squared-distance check)
+    if (px * px + py * py < (CELL_RADIUS + 5) ** 2) continue;
+    const vx = (Math.random() - 0.5) * 0.3;
+    const vy = (Math.random() - 0.5) * 0.3;
+    addParticle(px, py, vx, vy, PTYPE_SOLUTION);
+    solCount++;
+  }
+
+  // ============================================================
+  // 11. Free list: remaining inactive slots
   // ============================================================
   const freeList  = new Uint32Array(MAX_PARTICLES) as Uint32Array<ArrayBuffer>;
   let   freeCount = 0;

@@ -1,6 +1,7 @@
 // Pass 8: Particle type transitions
 // - Cytoplasm with age > cytoplLife → WASTE
 // - WASTE that wanders outside cell → INACTIVE (pushed to free list)
+// - Counts active cytoplasm particles into divisionCounter for the division trigger
 
 struct Uniforms {
     tick         : u32,
@@ -33,13 +34,14 @@ struct Particle {
     pad      : u32,
 };
 
-@group(0) @binding(0) var<uniform>             uniforms  : Uniforms;
-@group(0) @binding(1) var<storage, read_write>  particles : array<Particle>;
-@group(0) @binding(2) var<storage, read_write>  freeList  : array<u32>;
-@group(0) @binding(3) var<storage, read_write>  freeCtrl  : array<atomic<u32>>;
+@group(0) @binding(0) var<uniform>             uniforms         : Uniforms;
+@group(0) @binding(1) var<storage, read_write>  particles        : array<Particle>;
+@group(0) @binding(2) var<storage, read_write>  freeList         : array<u32>;
+@group(0) @binding(3) var<storage, read_write>  freeCtrl         : array<atomic<u32>>;
+@group(0) @binding(4) var<storage, read_write>  divisionCounter  : array<atomic<u32>>;
 
-const CELL_RADIUS     : f32  = 60.0;
-const MAX_PARTICLES_U : u32  = 2048u;
+const CELL_RADIUS     : f32  = 80.0;
+const MAX_PARTICLES_U : u32  = 4096u;
 
 const PTYPE_CYTOPLASM : u32 = 7u;
 const PTYPE_WASTE     : u32 = 18u;
@@ -57,6 +59,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     var p = particles[idx];
     if p.ptype == PTYPE_INACTIVE || (p.flags & 1u) == 0u { return; }
+
+    // Count active cytoplasm particles for the division readback
+    if p.ptype == PTYPE_CYTOPLASM {
+        atomicAdd(&divisionCounter[0], 1u);
+    }
 
     // Cytoplasm age → waste
     if p.ptype == PTYPE_CYTOPLASM && u32(p.age) > uniforms.cytoplLife {

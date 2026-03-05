@@ -16,13 +16,14 @@ import {
   MEMBRANE_K, NUCLEUS_K, CILIA_WAVE_STRENGTH, FLAGELLUM_WAVE_STRENGTH,
   CHANNEL_RADIUS, CYTOPLASM_LIFE,
   PARTICLE_STRIDE, BOND_STRIDE,
-  GRID_CELLS,
+  GRID_CELLS, WORLD_SIZE,
   FORCE_FP_SCALE,
   U_TICK, U_NUM_PARTICLES, U_NUM_BONDS,
   U_DT, U_BROWNIAN_STR, U_DAMPING, U_PRESSURE_K,
   U_MEMBRANE_K, U_NUCLEUS_K, U_CILIA_WAVE, U_FLAG_WAVE,
   U_CHANNEL_R, U_CYTOPLASM_LIFE,
   UNIFORM_SIZE,
+  DIVISION_THRESHOLD,
 } from "./buffers";
 
 // ---- Mutable sim params (tweakpane binds to these) ----
@@ -75,8 +76,8 @@ export async function startCellSim(
     ciliaWave:   CILIA_WAVE_STRENGTH,
     cytoplLife:  CYTOPLASM_LIFE,
     channelR:    CHANNEL_RADIUS,
-    zoom:        Math.min(canvas.width, canvas.height) / (200 * 2),
-    particlePx:  4.0,
+    zoom:        Math.min(canvas.width, canvas.height) / (WORLD_SIZE * 2),
+    particlePx:  2.5,
   };
 
   // -----------------------------------------------------------------------
@@ -173,6 +174,20 @@ export async function startCellSim(
   // head=0, tail=freeCount
   const freeCtrlData = new Uint32Array([0, scene.freeCount]);
   device.queue.writeBuffer(freeCtrlBuffer, 0, freeCtrlData);
+
+  // Division counter buffer: GPU atomically increments per cytoplasm particle
+  // CPU reads it back every DIVISION_READ_INTERVAL frames to check for division.
+  const divisionCounterBuffer = device.createBuffer({
+    label: "divisionCounter",
+    size:  4,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+  });
+  // Staging buffer for CPU readback
+  const divisionStagingBuffer = device.createBuffer({
+    label: "divisionStaging",
+    size:  4,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+  });
 
   // Uniform buffer (64 bytes)
   const uniformBuffer = device.createBuffer({
@@ -368,6 +383,7 @@ export async function startCellSim(
       { binding: 1, resource: { buffer: particleBuffer } },
       { binding: 2, resource: { buffer: freeListBuffer } },
       { binding: 3, resource: { buffer: freeCtrlBuffer } },
+      { binding: 4, resource: { buffer: divisionCounterBuffer } },
     ],
   });
 
@@ -415,10 +431,10 @@ export async function startCellSim(
   const pane = new Pane({ container: uiContainer });
 
   const simFolder = pane.addFolder({ title: "Simulation" });
-  simFolder.addBinding(params, "brownianStr", { min: 0, max: 2,    label: "Brownian Strength" });
+  simFolder.addBinding(params, "brownianStr", { min: 0, max: 5,    label: "Brownian Strength" });
   simFolder.addBinding(params, "damping",     { min: 0.9, max: 1.0, label: "Damping" });
   simFolder.addBinding(params, "xpbdIters",   { min: 1, max: 10, step: 1, label: "XPBD Iterations" });
-  simFolder.addBinding(params, "membraneK",   { min: 100, max: 2000, label: "Membrane Stiffness" });
+  simFolder.addBinding(params, "membraneK",   { min: 100, max: 3000, label: "Membrane Stiffness" });
   simFolder.addBinding(params, "ciliaWave",   { min: 0, max: 3,    label: "Cilia Wave Strength" });
 
   const cellFolder = pane.addFolder({ title: "Cell" });
@@ -426,8 +442,8 @@ export async function startCellSim(
   cellFolder.addBinding(params, "channelR",   { min: 5, max: 50,   label: "Channel Radius" });
 
   const camFolder = pane.addFolder({ title: "Camera" });
-  camFolder.addBinding(params, "zoom",       { min: 0.5, max: 20, label: "Zoom" }).on("change", writeCamera);
-  camFolder.addBinding(params, "particlePx", { min: 1.0,  max: 20.0, label: "Particle size (px)" }).on("change", writeCamera);
+  camFolder.addBinding(params, "zoom",       { min: 0.2, max: 20, label: "Zoom" }).on("change", writeCamera);
+  camFolder.addBinding(params, "particlePx", { min: 0.5,  max: 20.0, label: "Particle size (px)" }).on("change", writeCamera);
 
   const btnRandomise = pane.addButton({ title: "Randomise" });
   btnRandomise.on("click", () => {
@@ -471,6 +487,25 @@ export async function startCellSim(
   window.addEventListener("resize", onResize);
 
   // -----------------------------------------------------------------------
+  // Cell division: periodic cytoplasm readback + second-cell spawn
+  // -----------------------------------------------------------------------
+  const DIVISION_READ_INTERVAL = 120; // frames between readback checks
+  let divisionPending   = false;      // waiting for mapAsync to complete
+  let divisionTriggered = false;      // division has already occurred this session
+
+  /** Reinitialise the scene with a fresh cell when cytoplasm threshold is exceeded.
+   *  In a future version this will merge two daughter cells at offset positions. */
+  function triggerCellDivision(): void {
+    const s = initScene();
+    device.queue.writeBuffer(particleBuffer, 0, s.particleData);
+    device.queue.writeBuffer(bondBuffer,     0, s.bondData);
+    device.queue.writeBuffer(freeListBuffer, 0, s.freeList);
+    device.queue.writeBuffer(freeCtrlBuffer, 0, new Uint32Array([0, s.freeCount]));
+    device.queue.writeBuffer(divisionCounterBuffer, 0, new Uint32Array([0]));
+    divisionTriggered = false; // re-arm for next cycle
+  }
+
+  // -----------------------------------------------------------------------
   // Workgroup counts
   // -----------------------------------------------------------------------
   const particleWG = Math.ceil(MAX_PARTICLES / 64);
@@ -487,9 +522,10 @@ export async function startCellSim(
 
     const encoder = device.createCommandEncoder();
 
-    // 1. Clear forceAccumBuffer and xpbdDeltaBuffer to zero
+    // 1. Clear forceAccumBuffer, xpbdDeltaBuffer, and divisionCounter each frame
     encoder.clearBuffer(forceAccumBuffer);
     encoder.clearBuffer(xpbdDeltaBuffer);
+    encoder.clearBuffer(divisionCounterBuffer);
 
     // 2. Brownian motion + wave forces
     {
@@ -592,6 +628,26 @@ export async function startCellSim(
     }
 
     device.queue.submit([encoder.finish()]);
+
+    // Periodic cytoplasm count readback for cell division trigger
+    if (tick % DIVISION_READ_INTERVAL === 0 && !divisionPending && !divisionTriggered) {
+      divisionPending = true;
+      const readEnc = device.createCommandEncoder();
+      readEnc.copyBufferToBuffer(divisionCounterBuffer, 0, divisionStagingBuffer, 0, 4);
+      device.queue.submit([readEnc.finish()]);
+      divisionStagingBuffer.mapAsync(GPUMapMode.READ).then(() => {
+        const count = new Uint32Array(divisionStagingBuffer.getMappedRange())[0];
+        divisionStagingBuffer.unmap();
+        divisionPending = false;
+        if (count >= DIVISION_THRESHOLD) {
+          triggerCellDivision();
+        }
+      }).catch((err: unknown) => {
+        console.error('Division readback failed:', err);
+        divisionPending = false;
+      });
+    }
+
     rafId = requestAnimationFrame(frame);
   }
 
@@ -618,6 +674,8 @@ export async function startCellSim(
     linkedBuffer.destroy();
     freeListBuffer.destroy();
     freeCtrlBuffer.destroy();
+    divisionCounterBuffer.destroy();
+    divisionStagingBuffer.destroy();
     uniformBuffer.destroy();
     cameraBuffer.destroy();
   };
